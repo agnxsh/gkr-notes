@@ -1,3 +1,5 @@
+use std::iter::Product;
+
 use ark_ff::PrimeField;
 use ark_poly::MultilinearExtension;
 use crate::views::{
@@ -6,7 +8,7 @@ use crate::views::{
 
 pub trait Oracle<F> {
     fn ithroundops(&self, x: &[F], y: &[F]) -> F;
-    fn num_rounda(&self) -> usize;
+    fn num_rounds(&self) -> usize;
     fn trust_message(&self) -> String;
 }
 
@@ -38,7 +40,7 @@ impl <F: PrimeField, MLE: MultilinearExtension<F>> Oracle<F> for PolynomialOracl
     }
 
     // return the number of variables of each of the 2 polynomials
-    fn num_rounda(&self) -> usize {
+    fn num_rounds(&self) -> usize {
         let MLEProduct(_,f2,_) = &self.sum_of_products.elements[0];
         2*f2.num_vars()
     }
@@ -97,7 +99,7 @@ impl <F: PrimeField, MLE: MultilinearExtension<F>> Oracle<F> for CombinedPolynom
 
     // returns the number of variables of EACH of the two polynomials
     // the total value of variables of the product is twice that
-    fn num_rounda(&self) -> usize {
+    fn num_rounds(&self) -> usize {
         let MLEProduct(_, f2, _) = &self.sum_of_products.elements[0];
         2 * f2.num_vars()
     }
@@ -155,7 +157,7 @@ impl <F: PrimeField> Oracle<F> for GKROracle<F> {
     }
 
     // returns the number of variables of the Sparse Multilinear Extension, minus the number of bits needed to represent "current" layre
-    fn num_rounda(&self) -> usize {
+    fn num_rounds(&self) -> usize {
         let GKRVerifProduct(f1, _, _) = &self.sum_of_products.elements[0];
         f1.num_vars() - self.g1.len()
     }
