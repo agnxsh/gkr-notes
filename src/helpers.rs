@@ -1,3 +1,5 @@
+use std::iter::Once;
+
 use ark_crypto_primitives::sponge::{
     poseidon::{PoseidonConfig, PoseidonSponge},
     Absorb, CryptographicSponge,
@@ -71,4 +73,55 @@ impl<F: PrimeField + Absorb> Transcript<F> {
 
         sponge.squeeze_field_elements::<F>(1)[0]
     }
+
+    pub fn freeze_claim(&mut self, claimed_value: F) {
+        self.proof.claimed = Some(claimed_value);
+    }
+}
+
+// Separate a bit string represented as a usize into three values
+// the last of which correspond to
+#[inline]
+pub fn to_zxy_form(idx: usize, v: usize) -> (usize, usize, usize) {
+    let vp = 1 << v;
+
+    let y = idx % vp;
+    let idx_zx = idx / vp;
+    let x = idx_zx % vp;
+    let z = idx_zx / vp;
+
+    (z, x, y)
+}
+
+/// perform a polynomial interpolation of the univariate polynomial of degree
+/// `atmost` pi.len()-1 passing through the y-axis in pi at x = 0,1,2,...pi.len()-1
+/// and evaluate the polynomial at `eval_at`.
+pub(crate) fn univariate_polynomial_interpolation<F: PrimeField>(p_i: &[F], evaluate_at: F) -> F {
+    let pilen = p_i.len();
+    
+    let mut evals = vec![];
+    let mut prod = evaluate_at;
+    evals.push(evaluate_at);
+
+    // ∏ = ∏_j (evaluate_at - j)
+    let mut check = F::zero();
+    for i in 1..pilen {
+        if evaluate_at == check {
+            return p_i[i -1];
+        }
+        check += F::one();
+
+        let temp = evaluate_at - check;
+        evals.push(temp);
+        prod *= temp;
+    }
+
+    if evaluate_at == check {
+        return p_i[pilen - 1];
+    }
+
+    let mut res = F::zero();
+
+    res
+
 }
