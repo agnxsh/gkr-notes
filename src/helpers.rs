@@ -1,4 +1,4 @@
-use std::iter::Once;
+use std::{iter::Once, ops::MulAssign};
 
 use ark_crypto_primitives::sponge::{
     poseidon::{PoseidonConfig, PoseidonSponge},
@@ -6,11 +6,24 @@ use ark_crypto_primitives::sponge::{
 };
 use ark_ff::PrimeField;
 use ark_std::{iterable::Iterable, test_rng};
+use num_traits::{One, PrimInt, NumCast};
 
 // Define publicly usable constants
 pub const FULL_ROUNDS: usize = 8;
 pub const PARTIAL_ROUNDS: usize = 31;
 pub const ALPHA: u64 = 17; // Assuming `alpha` is an exponent and should be a positive integer
+
+#[inline]
+fn factorial<T>(a: usize) -> T
+where
+    T: One + MulAssign + NumCast + PrimInt,
+{
+    let mut res = T::one();
+    for i in 1..=a {
+        res *= T::from(i).unwrap();
+    }
+    res
+}
 
 pub fn get_mds<F: PrimeField>() -> Vec<Vec<F>> {
     vec![
@@ -121,6 +134,25 @@ pub(crate) fn univariate_polynomial_interpolation<F: PrimeField>(p_i: &[F], eval
     }
 
     let mut res = F::zero();
+    // computing \prod (j!=i) (i-j) for a given i
+    //
+    // we start from the last step, which is
+    // den[len - 1] = (len - 1) * (len - 2) * ... *2*1
+
+    if p_i.len() <= 20 {
+        let mut last_denominator: u64 = factorial(pilen - 1);
+        let mut ratio_numerator = 1i64;
+        let mut ratio_curr_numerator = 1u64;
+
+        for i in (0..pilen).rev() {
+            let ratio_numerator_f = if ratio_numerator < 0{
+                -F::from((-ratio_numerator) as u64)
+            } else {
+                F::from(ratio_numerator as u64)
+            };
+        }
+    }
+
 
     res
 
