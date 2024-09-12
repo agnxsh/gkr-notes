@@ -64,9 +64,9 @@ impl<F: PrimeField + Absorb, MLE: MultilinearExtension<F>> Prover<F, MLE> {
                 let mut f_values = vec![vec![F::zero(); 1 << (v-1)]; 3];
                 let mut g_values = vec![vec![F::zero(); 1 << (v-1)]; 3];
                 let A_f = &A_fs[summand];
-                let A_g = &A_g[summand];
+                let A_g = &A_gs[summand];
 
-                
+
             }
         }
 
