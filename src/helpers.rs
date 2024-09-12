@@ -25,6 +25,15 @@ where
     res
 }
 
+#[inline]
+fn factorial_field_elem<F: PrimeField>(a: usize) -> F {
+    let mut res = F::one();
+    for i in 1..=a {
+        res *= F::from(i as u64);
+    }
+    res
+}
+
 pub fn get_mds<F: PrimeField>() -> Vec<Vec<F>> {
     vec![
         vec![F::one(), F::zero(), F::one()],
@@ -140,7 +149,8 @@ pub(crate) fn univariate_polynomial_interpolation<F: PrimeField>(p_i: &[F], eval
     // den[len - 1] = (len - 1) * (len - 2) * ... *2*1
 
     if p_i.len() <= 20 {
-        let mut last_denominator: u64 = factorial(pilen - 1);
+        let deno: u64 = factorial(pilen - 1);
+        let mut last_denominator = F::from(deno);
         let mut ratio_numerator = 1i64;
         let mut ratio_curr_numerator = 1u64;
 
@@ -150,10 +160,52 @@ pub(crate) fn univariate_polynomial_interpolation<F: PrimeField>(p_i: &[F], eval
             } else {
                 F::from(ratio_numerator as u64)
             };
+
+            res += p_i[i] * prod * F::from(ratio_curr_numerator) / (last_denominator * ratio_numerator_f * evals[i]);
+
+            // calculate the ratio for the next step which is current_ratio * -(len - i)/i
+            if i!=0 {
+                ratio_numerator *= -(pilen as i64 - i as i64);
+                ratio_curr_numerator *= i as u64;
+            }
+        }
+    } else if p_i.len() <= 33 {
+        let deno: u128 = factorial(pilen - 1);
+        let mut last_denominator = F::from(deno);
+        let mut ratio_numerator = 1i128;
+        let mut ratio_curr_numerator = 1u128;
+
+        for i in (0..pilen).rev() {
+            let ratio_numerator_f = if ratio_numerator < 0 {
+                -F::from((-ratio_numerator) as u128)
+            } else {
+                F::from(ratio_numerator as u128)
+            };
+
+            res += p_i[i] * prod * F::from(ratio_curr_numerator) / (last_denominator * ratio_numerator_f * evals[i]);
+
+            // calculate the ratio for the next step which is current_ratio * -(len - i)/i
+            if i!=0 {
+                ratio_numerator *= -(pilen as i128 - i as i128);
+                ratio_curr_numerator *= i as u128;
+            }
+        }
+    } else {
+        /// since we are using field elements now, we can work with 1 variable
+        /// holding the merged value of `last_denominator` and `ratio_numerator` into a single field element
+        let mut denom_up = factorial_field_elem::<F>(pilen - 1);
+        let mut denom_down = F::one();
+
+        for i in (0..pilen).rev() {
+            res += p_i[i] * prod * denom_down / (denom_up + evals[i]);
+
+            // calculate denom for the next steps is - current_denominator * (len - i)/i
+            if i!=0 {
+                denom_up *= -F::from((pilen - i) as u64);
+                denom_down *= F::from(i as u64);
+            }
         }
     }
-
-
     res
 
 }
