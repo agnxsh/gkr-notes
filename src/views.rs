@@ -11,9 +11,9 @@ pub struct GKRVerifProduct<F: PrimeField> (
     pub F
 );
 
-impl<F: PrimeField> From <(SparseMultilinearExtension<F>, F, F)> for GKRVerifProduct<F> {
-    fn from((sme, f1, f2): (SparseMultilinearExtension<F>, F, F)) -> Self {
-        GKRVerifProduct(sme, f1, f2)
+impl<F: PrimeField> From<(SparseMultilinearExtension<F>, F, F)> for GKRVerifProduct<F> {
+    fn from(tuple: (SparseMultilinearExtension<F>, F, F)) -> Self {
+        Self(tuple.0, tuple.1, tuple.2)
     }
 }
 
