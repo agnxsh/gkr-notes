@@ -63,4 +63,24 @@ impl <F: PrimeField, const s: usize> UniformCircuit<F, s> {
             phantom: PhantomData::<F>,
         }
     }
+
+    /// this is a plain circuit evaluation given the input x 
+    /// asserts that each layer is uniform with 1 << s evaluations
+    pub fn evaluate(&self, x: Vec<F>) -> Vec<Vec<F>> {
+        let mut evals = Vec::new();
+        let mut last_layer = x;
+
+        for layer in self.layers.iter().rev() {
+            let mut new_layer: Vec<F> = vec![F::zero(); layer.add.len() + layer.multiply.len()];
+            
+            // handle addition
+            for Wiring {
+                current_idx,
+                left,
+                right,
+            } in layer.add.iter(){
+                
+            }
+        }
+    }
 }
