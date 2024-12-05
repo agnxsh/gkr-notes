@@ -40,10 +40,10 @@ impl<F: PrimeField + Absorb> Transcript <F> {
    }
 
    fn update(&mut self, elements: &[F], sponge: &mut PoseidonSponge<F>, n: usize) -> Vec<F> {
-    for elem in elems.iter(){
+    for elem in elements.iter(){
         sponge.absorb(elem);
     }
-    self.proof_end.items.push(elems.to_vec());
+    self.proof_end.items.push(elements.to_vec());
     sponge.squeeze_field_elements::<F>(n)
    }
 }
@@ -70,16 +70,16 @@ impl<F: PrimeField + Absorb, const s: usize> Prover <F, s> {
         let d = self.circuit.layers.len();
 
         let distinct_one =
-            DenseMultilinearExtension::from_evaluations_vec(s, vec![F::one(); 1 << S]);
+            DenseMultilinearExtension::from_evaluations_vec(s, vec![F::one(); 1 << s]);
         
         // compute all the layers of the proving system
-        let w = self.circuit.evaluate(x);
+        let w = self.circuit.evaluate(v);
         // iterate over the circuit layers in reverse indices order for w,
         // since the input layer is at the 0th index
         let r0 = self.transcript.update(&w[d-1], &mut self.sponge, s);
 
-        let mut alpha = F::new();
-        let mut beta = F::new();
+        let mut alpha = F::one();
+        let mut beta = F::zero();
         let mut ui = r0.clone();
         let mut vi = r0;
 
@@ -90,12 +90,12 @@ impl<F: PrimeField + Absorb, const s: usize> Prover <F, s> {
                 (&self.circuit.layers[i]).into();
 
             let f_i_1 = (
-                add_i_mle.clone(),
-                w_iplus1_mle.clone(),
-                identically_one.clone(),
+                add_i_to_mle.clone(),
+                wi_plus_mle.clone(),
+                distinct_one.clone(),
             );
-            let f_i_2 = (add_i_mle, identically_one.clone(), w_iplus1_mle.clone());
-            let f_i_3 = (mul_i_mle, w_iplus1_mle.clone(), w_iplus1_mle.clone());
+            let f_i_2 = (add_i_to_mle, distinct_one.clone(), wi_plus_mle.clone());
+            let f_i_3 = (mul_i_to_mle, wi_plus_mle.clone(), wi_plus_mle.clone());
 
             let mut sumcheck_prover = SumCheckProver::new(
                 vec![f_i_1.into(), f_i_2.into(), f_i_3.into()].into(),
@@ -122,11 +122,11 @@ impl<F: PrimeField + Absorb, const s: usize> Prover <F, s> {
             beta = temp_scalars[1];
 
             // add the sumcheck transcript to the GKR transcript
-            self.transcript.proof.sumcheck_proofs.push(sumcheck_proof);
+            self.transcript.proof_end.sumcheck_proofs.push(sumcheck_proof);
         }
 
         Transcript {
-            proof_end: self.transcript.proof.clone(),
+            proof_end: self.transcript.proof_end.clone(),
         }
     }
 }

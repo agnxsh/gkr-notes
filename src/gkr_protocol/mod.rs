@@ -1,9 +1,12 @@
 use ark_poly::SparseMultilinearExtension;
 use rand::distributions::Slice;
+use rand_chacha::rand_core::le;
 use std::marker::PhantomData;
 use ark_ff::PrimeField;
 
+use crate::{side::to_le_indices};
 
+pub mod ends;
 #[derive(Debug)]
 pub struct Wiring<const s: usize> {
     current_idx: usize,
@@ -36,6 +39,37 @@ impl <const s: usize> Layering<s> {
             add,
             multiply,
         }
+    }
+}
+
+impl <F: PrimeField, const s: usize> From<&Layering<s>> for [SparseMultilinearExtension<F>; 2] {
+    /// Assume a uniform circuit first
+    fn from(val: &Layering<s>) -> Self {
+        let leindices = to_le_indices(3 * s);
+        let addindices: Vec<usize> = val
+            .add
+            .iter()
+            .map(|w| {
+                /// cook the index from the current index, left index and right index
+                let index_be: usize = (w.current_idx << (2*s)) + (w.left << (s)) + w.right;
+                leindices[index_be]
+            })
+            .collect();
+        let add_evals: Vec<(usize, F)> = addindices.iter().map(|i| (*i, F::one())).collect();
+        let add_mle = SparseMultilinearExtension::from_evaluations(3 * s, &add_evals);
+
+        let mul_indices: Vec<usize> = val
+            .multiply
+            .iter()
+            .map(|w| {
+                // cook the index from the current index, left index and right index
+                let indexbe: usize = (w.current_idx << (2 * s)) + (w.left << (s)) + w.right;
+                leindices[indexbe]
+            }).collect();
+        let mul_evals: Vec<(usize, F)> = mul_indices.iter().map(|i| (*i, F::one())).collect();
+        let mul_mle = SparseMultilinearExtension::from_evaluations(3 * s, &mul_evals);
+        /// returning both add and mul evaluations
+        [add_mle, mul_mle]
     }
 }
 
@@ -79,8 +113,24 @@ impl <F: PrimeField, const s: usize> UniformCircuit<F, s> {
                 left,
                 right,
             } in layer.add.iter(){
-                
+                new_layer[*current_idx] = last_layer[*left] + last_layer[*right];
             }
+
+            // handle multiplication
+            for Wiring {
+                current_idx,
+                left,
+                right
+            } in layer.multiply.iter()
+            {
+                new_layer[*current_idx] = last_layer[*left] *last_layer[right];
+            }
+
+            assert_eq!(new_layer.len(), 1 << s, "non uniform circuit");
+            evals.push(new_layer.clone());
+
+            last_layer = new_layer;
         }
+        evals
     }
 }
