@@ -50,7 +50,7 @@ impl <F: PrimeField, const s: usize> From<&Layering<s>> for [SparseMultilinearEx
             .add
             .iter()
             .map(|w| {
-                /// cook the index from the current index, left index and right index
+                // cook the index from the current index, left index and right index
                 let index_be: usize = (w.current_idx << (2*s)) + (w.left << (s)) + w.right;
                 leindices[index_be]
             })
@@ -68,7 +68,7 @@ impl <F: PrimeField, const s: usize> From<&Layering<s>> for [SparseMultilinearEx
             }).collect();
         let mul_evals: Vec<(usize, F)> = mul_indices.iter().map(|i| (*i, F::one())).collect();
         let mul_mle = SparseMultilinearExtension::from_evaluations(3 * s, &mul_evals);
-        /// returning both add and mul evaluations
+        // returning both add and mul evaluations
         [add_mle, mul_mle]
     }
 }
@@ -123,7 +123,7 @@ impl <F: PrimeField, const s: usize> UniformCircuit<F, s> {
                 right
             } in layer.multiply.iter()
             {
-                new_layer[*current_idx] = last_layer[*left] *last_layer[right];
+                new_layer[*current_idx] = last_layer[*left] * last_layer[*right];
             }
 
             assert_eq!(new_layer.len(), 1 << s, "non uniform circuit");
