@@ -7,6 +7,7 @@ use ark_ff::PrimeField;
 use crate::{side::to_le_indices};
 
 pub mod ends;
+mod tests;
 #[derive(Debug)]
 pub struct Wiring<const s: usize> {
     current_idx: usize,

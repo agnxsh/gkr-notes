@@ -134,13 +134,13 @@ impl<F: PrimeField + Absorb, const s: usize> Prover <F, s> {
     }
 }
 
-pub struct Verifer<F: PrimeField + Absorb, const s: usize> {
+pub struct Verifier<F: PrimeField + Absorb, const s: usize> {
     circuit: UniformCircuit<F, s>,
     sponge: PoseidonSponge<F>,
     transcript: Transcript<F>,
 }
 
-impl <F: PrimeField + Absorb, const s: usize> Verifer<F, s> {
+impl <F: PrimeField + Absorb, const s: usize> Verifier<F, s> {
     pub fn new(
         circuit: UniformCircuit<F, s>,
         sponge: PoseidonSponge<F>,
