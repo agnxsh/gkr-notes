@@ -6,7 +6,6 @@ use ark_poly::{
     evaluations::multivariate::{DenseMultilinearExtension, MultilinearExtension},
     SparseMultilinearExtension,
 };
-use rand_chacha::rand_core::le;
 
 use super::UniformCircuit;
 use crate::helpers::SumCheckProof;
