@@ -1,6 +1,7 @@
-use std::{collections::VecDeque, iter::Product, result};
+use core::num;
+use std::{backtrace, collections::VecDeque, iter::Product, result};
 
-use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
+use ark_crypto_primitives::sponge::{self, poseidon::PoseidonSponge};
 use ark_crypto_primitives::sponge::Absorb;
 use ark_ff::PrimeField;
 
@@ -305,4 +306,57 @@ pub fn run_sumcheck_protocol<F: PrimeField + Absorb, MLE: MultilinearExtension<F
 
     let (result, _) = verifier.run();
     assert!(result)
+}
+
+// Run the protocol and return true iff the verifier does not abort
+pub fn run_sumcheck_protocol_combined<F: PrimeField + Absorb, MLE: MultilinearExtension<F>>(
+    f1: SparseMultilinearExtension<F>,
+    f2: MLE,
+    f3: MLE,
+    g1: &[F],
+    g2: &[F],
+    alpha: F,
+    beta: F,
+) {
+    let simple_sum = GKRProverSumOfProduct {
+        elements: vec![MLEProduct(f1.clone(), f2.clone(), f3.clone())],
+    };
+
+    // Need to use the same sponge, since it's initialized with random values
+    let sponge = test_sponge();
+    let mut prover = Prover::new(simple_sum, sponge.clone());
+    let (proof, random_challenges) = prover.run(g1, g2, alpha, beta);
+    let num_challenges = random_challenges.len();
+    let (bstar, cstar) = random_challenges.split_at(num_challenges / 2);
+
+    let wui = &f2.evaluate(bstar).unwrap();
+    let wvi = &f3.evaluate(cstar).unwrap();
+
+    let gkr_prod = GKRVerifProduct(f1,*wui, *wvi);
+    let gkr_sum = GKRVerifSumOfProduct {
+        elements: vec![gkr_prod]
+    };
+
+    let gkr_oracle = GKROracle::new(gkr_sum, g1.to_vec(), g2.to_vec(), alpha, beta);
+    let mut verifier = Verifier::new(gkr_oracle, sponge, proof);
+
+    assert!(verifier.run().0);
+}
+
+pub fn run_sumcheck_protocol_combined_multiproof<F: PrimeField + Absorb, MLE: MultilinearExtension<F>>(
+    sum_of_products: GKRProverSumOfProduct<F, MLE>,
+    g1: &[F],
+    g2: &[F],
+    alpha: F,
+    beta: F,
+) {
+    // Need to use the same sponge, and they are initialised with randomized values
+    let sponge = test_sponge();
+    let mut prover = Prover::new(sum_of_products.clone(), sponge.clone());
+    let (proof, _) = prover.run(g1, g2, alpha, beta);
+    let mut verifier = Verifier::new(
+        CombinedPolynomialOracle::<F, MLE>::new(sum_of_products, g1.to_vec(), g2.to_vec(), alpha, beta), 
+        sponge, 
+        proof);
+    assert!(verifier.run().0);
 }
