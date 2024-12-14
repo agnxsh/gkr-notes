@@ -1,14 +1,13 @@
 #[cfg(test)]
 mod tests {
+    use core::num;
+
     use crate::{
-        views::{MLEProduct, GKRProverSumOfProduct},
-        side::{
+        helpers::to_zxy_form, side::{
             phase1_start as p1_org,
             phase2_start as p2_org, run_sumcheck_protocol,
             run_sumcheck_protocol_combined, run_sumcheck_protocol_combined_multiproof
-        },
-        helpers::to_zxy_form,
-        Fq,
+        }, views::{GKRProverSumOfProduct, GKRVerifSumOfProduct, MLEProduct}, Fq
     };
     use ark_ff::PrimeField;
     use ark_poly::{DenseMultilinearExtension, MultilinearExtension, SparseMultilinearExtension};
@@ -302,5 +301,221 @@ mod tests {
         );
 
         run_sumcheck_protocol(f1, f2, f3, &g);   
+    }
+
+    #[test]
+    fn tests_sumcheck_random() {
+        let mut test_rng = ark_std::test_rng();
+        // degree_x is the degree of both f2 (in x) and f3 (in y)
+        // only go up to degree 7, otherwise tests start taking longer than that
+        for degree_x in 3..8 {
+            // degree of f1
+            let d = 3 * degree_x;
+            // cook a random sparse MLE with 2^(d - 2) evaluation points (25% density)
+            let num_evaluations: usize = 1 << (d - 2);
+            let points = (0..num_evaluations)
+                .map(|i| (i, Fq::rand(&mut test_rng)))
+                .collect::<Vec<_>>();
+            let f1 = SparseMultilinearExtension::from_evaluations(
+                d,
+                &points);
+            // cook a random g
+            let g = (0..degree_x)
+                .map(|_| Fq::rand(&mut test_rng))
+                .collect::<Vec<_>>();
+            let f2 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),
+            );
+            let f3 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),
+            );
+
+            run_sumcheck_protocol(f1, f2, f3, &g);
+        }
+    }
+
+    #[test]
+    fn tests_sumcheck_simple_combination() {
+        // same parameters as the test tests_sumcheck, using the linear
+        // combination, first with the coefficient (1, 0) and (0, 1)
+
+        let points = vec![(8, Fq::from(1_u64)), (32, Fq::from(2_u64))];
+
+        // assume |x| = |y| = |z| = 2 so f1 would be a 6-variate
+        let f1 = SparseMultilinearExtension::from_evaluations(6, &points);
+        let g = vec![Fq::from(2u64), Fq::from(3u64)];
+        let f2 = DenseMultilinearExtension::from_evaluations_vec(
+            2,
+            vec![1, 6, 5, 0]
+                .into_iter()
+                .map(|x| Fq::from(x as u64))
+                .collect(),
+        );
+
+        let f3 = DenseMultilinearExtension::from_evaluations_vec(
+            2,
+            vec![1, 6, 5, 0]
+                .into_iter()
+                .map(|x| Fq::from(x as u64))
+                .collect(),
+        );
+
+
+        let zero_vector = vec![Fq::from(0_u64); g.len()];
+        let ones_vector = vec![Fq::from(0_u64); g.len()];
+
+        run_sumcheck_protocol_combined(
+            f1.clone(),
+            f2.clone(),
+            f3.clone(),
+            &g,
+            &zero_vector,
+            Fq::from(1u64),
+            Fq::from(0_u64),
+        );
+
+        run_sumcheck_protocol_combined(
+            f1,
+            f2,
+            f3,
+            &ones_vector,
+            &g,
+            Fq::from(0_u64),
+            Fq::from(1u64),
+        );
+    }
+
+    #[test]
+    fn tests_sumcheck_randomized_combination(){
+        let mut test_rng = ark_std::test_rng();
+        // degree x is the degree of both f2 and f3
+        for degree_x in 3..8{
+            // total degree in f1
+            let d = 3 * degree_x;
+            // cook a random sparse MLE with 2^(d-2) evaluation points (25% density)
+            let num_evals: usize = 1 << (d - 2);
+            let points = (0..num_evals)
+                .map(|i| (i, Fq::rand(&mut test_rng)))
+                .collect::<Vec<_>>();
+            let f1 = SparseMultilinearExtension::from_evaluations(
+                d,
+                &points
+            );
+            // generate a random g1
+            let g1 = (0..degree_x)
+                .map(|_| Fq::rand(&mut test_rng))
+                .collect::<Vec<_>>();
+            // generate a random g2
+            let g2 = (0..degree_x)
+                .map(|_| Fq::rand(&mut test_rng))
+                .collect::<Vec<_>>();
+            // generate a random f2
+            let f2 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),   
+            );
+            // generate a random f3
+            let f3 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),   
+            );
+
+            run_sumcheck_protocol_combined(
+                f1.clone(),
+                f2.clone(),
+                f3.clone(),
+                &g1,
+                &g2,
+                Fq::rand(&mut test_rng),
+                Fq::rand(&mut test_rng),
+            );
+        }
+    }
+
+    #[test]
+    fn tests_sumcheck_randomized_combination_multiproof() {
+        let mut test_rng = ark_std::test_rng();
+        // degree_x is the degree of both f2 and f3
+        // only climbing upto degree 7
+        for degree_x in 3..8 {
+            // total degree of f1
+            let d = 3 * degree_x;
+            // cook a random sparse MLE with 2^(d-2) evaluation points (25% density)
+            let num_evals: usize = 1 << (d - 2);
+            let points = (0..num_evals)
+                .map(|i| (i, Fq::rand(&mut test_rng)))
+                .collect::<Vec<_>>();
+            let f11 = SparseMultilinearExtension::from_evaluations(
+                d,
+                &points,
+            );
+            let points2 = (0..num_evals)
+                .map(|i| (i, Fq::rand(&mut test_rng)))
+                .collect::<Vec<_>>();
+            let f12 = SparseMultilinearExtension::from_evaluations(
+                d,
+                &points,
+            );
+            // generate random g1
+            let g1 = (0..degree_x)
+                .map(|_| Fq::rand(&mut test_rng))
+                .collect::<Vec<_>>();
+            // generate random g2
+            let g2 = (0..degree_x)
+                .map(|_| Fq::rand(&mut test_rng))
+                .collect::<Vec<_>>();
+            // generating first f2 fron the random coefficients
+            let f21 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),
+            );
+            // generating first f2 fron the random coefficients
+            let f31 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),
+            );
+            let f22 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),
+            );
+            let _f32 = DenseMultilinearExtension::from_evaluations_vec(
+                degree_x,
+                (0..(1 << degree_x))
+                    .map(|_| Fq::rand(&mut test_rng))
+                    .collect::<Vec<_>>(),
+            );
+
+            let sum_of_products = GKRProverSumOfProduct {
+                elements: vec![
+                    MLEProduct(f11.clone(), f21.clone(), f31.clone()),
+                    MLEProduct(f12.clone(), f22.clone(), _f32.clone()),
+                ],
+            };
+
+            run_sumcheck_protocol_combined_multiproof(
+                sum_of_products,
+                &g1,
+                &g2,
+                Fq::rand(&mut test_rng),
+                Fq::rand(&mut test_rng),
+            );
+
+        }
     }
 }
